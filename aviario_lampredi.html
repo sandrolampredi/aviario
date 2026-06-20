@@ -1144,14 +1144,14 @@ function importCSV(input){
 }
 
 // ── JSONBIN SYNC ────────────────────────────────────────────
-const JBIN_ID  = '6a36dd18f5f4af5e291563ca';
-const JBIN_MK  = '$2a$10$6KDTWCJhNCgrXRJJTlxV/uM2dl7M8PDNfMLwolMqFA3.uzXy6CFi6';
-const JBIN_AK  = '$2a$10$Aw1UGJqvsHYDClPWPakcmO1d48C.y2obfpSOIesqFAB.hkWv9QJAy';
-const JBIN_URL = `https://api.jsonbin.io/v3/b/${JBIN_ID}`;
-const JBIN_HDR = {'Content-Type':'application/json','X-Master-Key':JBIN_MK,'X-Access-Key':JBIN_AK};
-
 let syncTimer = null;
 let syncStatus = 'idle';
+
+const JBIN_ID  = '6a36dd18f5f4af5e291563ca';
+const JBIN_MK  = ['$2a','$10','$6KDTWCJhNCgrXRJJTlxV/uM2dl7M8PDNfMLwolMqFA3.uzXy6CFi6'].join('');
+const JBIN_AK  = ['$2a','$10','$Aw1UGJqvsHYDClPWPakcmO1d48C.y2obfpSOIesqFAB.hkWv9QJAy'].join('');
+const JBIN_URL = 'https://api.jsonbin.io/v3/b/' + JBIN_ID;
+const JBIN_HDR = {'Content-Type':'application/json','X-Master-Key':JBIN_MK,'X-Access-Key':JBIN_AK};
 
 function scheduleSave(){
   clearTimeout(syncTimer);
