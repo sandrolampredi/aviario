@@ -136,12 +136,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 <div class="app">
-  <div class="nav">
+  <div class="nav" style="position:relative">
     <button class="active" onclick="showTab('nuovo')">＋ Nuovo</button>
     <button onclick="showTab('covata')">🥚 Covata</button>
     <button onclick="showTab('registro')">≡ Lista</button>
     <button onclick="showTab('albero')">⊞ Albero</button>
     <button onclick="showTab('backup')">⬡ Backup</button>
+    <span id="sync-badge" title="Stato sincronizzazione cloud"
+      style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+             font-size:14px;color:var(--text3);pointer-events:none">☁</span>
   </div>
 
   <!-- NUOVO -->
@@ -416,11 +419,28 @@ let editId = null;
 let presenteVal = true;
 
 function loadDB(){ try{ db=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ db=[]; } }
-function saveDB(){ try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(db)); }catch(e){} }
+function saveDB(){
+  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(db)); }catch(e){}
+  scheduleSave();
+}
 loadDB();
 
 document.getElementById('cur-year').textContent = String(new Date().getFullYear()).slice(-2);
 updateStats();
+
+// Carica dal cloud all'avvio
+(async () => {
+  syncStatus = 'syncing';
+  updateSyncBadge();
+  const loaded = await cloudLoad();
+  if(loaded) {
+    updateStats();
+    renderList();
+    showToast('Registro sincronizzato dal cloud');
+  }
+  syncStatus = 'idle';
+  updateSyncBadge();
+})();
 
 // ── NAVIGATION ──────────────────────────────────────────────
 function showTab(t){
@@ -880,22 +900,24 @@ function normalizeRingField(inp){
   let v = inp.value.trim();
   if(!v) return;
   // Separa i token su spazi, trattini, slash, punti
+  // RNA può essere numerico (es. 9297) o alfanumerico (es. DF45)
   const tokens = v.toUpperCase().split(/[\s\-\/\.]+/).filter(Boolean);
   if(tokens.length >= 3){
-    const rna  = tokens[0];          // es. DF45
-    let   t1   = tokens[1];          // potrebbe essere anno o numero
-    let   t2   = tokens[2];          // potrebbe essere numero o anno
-    // Determina qual è l'anno (2 o 4 cifre numeriche ≤ anno corrente)
-    // e qual è il numero progressivo
+    // Il primo token è SEMPRE l'RNA, indipendentemente dal fatto che sia numerico
+    const rna = tokens[0];
+    let t1 = tokens[1];   // anno o numero
+    let t2 = tokens[2];   // numero o anno
+    // Determina qual è l'anno: 2 cifre comprese tra 20 e anno corrente+1
+    // oppure 4 cifre (es. 2023)
     const curYY = parseInt(String(new Date().getFullYear()).slice(-2));
-    let anno, num;
     const n1 = parseInt(t1), n2 = parseInt(t2);
-    const isAnno1 = (t1.length === 2 || t1.length === 4) && n1 >= 20 && n1 <= curYY + 1;
+    const isAnno1 = (t1.length === 4 && n1 >= 2020) ||
+                    (t1.length === 2 && n1 >= 20 && n1 <= curYY + 1);
+    let anno, num;
     if(isAnno1){
       anno = t1.length === 4 ? t1.slice(-2) : t1;
       num  = t2;
     } else {
-      // formato vecchio RNA-NUM-ANNO → inverti in RNA-ANNO-NUM
       anno = t2.length === 4 ? t2.slice(-2) : t2;
       num  = t1;
     }
@@ -906,7 +928,7 @@ function normalizeRingField(inp){
     const yr  = String(new Date().getFullYear()).slice(-2);
     inp.value = `${rna}-${yr}-${num}`;
   }
-  // Evidenzia se trovato in registro
+  // Evidenzia verde se trovato in registro, grigio altrimenti
   const found = db.find(s => s.id === inp.value);
   inp.style.borderColor = found ? 'var(--green)' : '';
 }
