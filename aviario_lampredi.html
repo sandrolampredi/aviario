@@ -363,6 +363,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div id="tab-backup" class="section">
 
     <div class="backup-section">
+      <h3>☁ Sincronizzazione cloud</h3>
+      <div class="info-box">
+        I dati vengono salvati automaticamente su JSONBin ad ogni modifica.<br>
+        Il badge ☁ in alto a destra mostra lo stato: ↻ salvataggio · ✓ sincronizzato · ✗ errore.
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="cloudSave().then(()=>{updateSyncBadge();showToast('Salvato sul cloud')})">↑ Salva ora sul cloud</button>
+        <button class="btn" onclick="cloudLoad().then(ok=>{ if(ok){updateStats();renderList();showToast('Caricato dal cloud');} else{showToast('Nessun dato sul cloud');} })">↓ Carica dal cloud</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="backup-section">
       <h3>⬡ Backup JSON</h3>
       <div class="info-box">
         Esporta tutti i dati in un file JSON e salvalo in <strong>Google Drive → Doc-Allevamento</strong>.<br>
@@ -1127,6 +1141,57 @@ function importCSV(input){
     input.value='';
   };
   reader.readAsText(file,'UTF-8');
+}
+
+// ── JSONBIN SYNC ────────────────────────────────────────────
+const JBIN_ID  = '6a36dd18f5f4af5e291563ca';
+const JBIN_MK  = '$2a$10$6KDTWCJhNCgrXRJJTlxV/uM2dl7M8PDNfMLwolMqFA3.uzXy6CFi6';
+const JBIN_AK  = '$2a$10$Aw1UGJqvsHYDClPWPakcmO1d48C.y2obfpSOIesqFAB.hkWv9QJAy';
+const JBIN_URL = `https://api.jsonbin.io/v3/b/${JBIN_ID}`;
+const JBIN_HDR = {'Content-Type':'application/json','X-Master-Key':JBIN_MK,'X-Access-Key':JBIN_AK};
+
+let syncTimer = null;
+let syncStatus = 'idle';
+
+function scheduleSave(){
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>cloudSave(), 1500);
+}
+
+async function cloudSave(){
+  if(syncStatus==='syncing') return;
+  syncStatus='syncing'; updateSyncBadge();
+  try{
+    const res = await fetch(JBIN_URL,{method:'PUT',headers:JBIN_HDR,body:JSON.stringify(db)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    syncStatus='ok';
+  }catch(e){
+    syncStatus='err';
+    console.warn('Cloud save error:',e.message);
+  }
+  updateSyncBadge();
+  setTimeout(()=>{ syncStatus='idle'; updateSyncBadge(); },3000);
+}
+
+async function cloudLoad(){
+  try{
+    const res = await fetch(JBIN_URL+'/latest',{headers:JBIN_HDR});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const remote = data.record;
+    if(Array.isArray(remote) && remote.length > 0){
+      db = remote; saveDB(); return true;
+    }
+  }catch(e){ console.warn('Cloud load error:',e.message); }
+  return false;
+}
+
+function updateSyncBadge(){
+  const badge = document.getElementById('sync-badge');
+  if(!badge) return;
+  const map = {idle:{t:'☁',c:'var(--text3)'},syncing:{t:'↻',c:'var(--amber)'},ok:{t:'✓',c:'var(--green)'},err:{t:'✗',c:'var(--red)'}};
+  const st = map[syncStatus]||map.idle;
+  badge.textContent=st.t; badge.style.color=st.c;
 }
 
 // ── LOCAL DATA ──────────────────────────────────────────────
